@@ -49,8 +49,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User updateUser(User user, MultipartFile profile) throws IOException, MediaTypeFormatExeption {
-        User userFromDb = userRepo.findUserById(user.getId());
-        if (user != null && userFromDb != null) {
+        User userFromDb = null;
+        if (user != null) {
+            userFromDb = userRepo.findUserById(user.getId());
             if (profile != null) {
                 if (userFromDb.getProfile() != null) {
                     storageService.deleteFile(userFromDb.getProfile());
@@ -63,14 +64,14 @@ public class UserServiceImpl implements UserService {
             Set<String> ignoredFields = new HashSet<>();
             ignoredFields.add("id");
             for (PropertyDescriptor pds : new BeanWrapperImpl().getPropertyDescriptors()) {
-                if (pds.getValue(pds.getName())==null){
+                if (pds.getValue(pds.getName()) == null) {
                     ignoredFields.add(pds.getName());
                 }
             }
             BeanUtils.copyProperties(user, userFromDb, ignoredFields.toArray(new String[ignoredFields.size()]));
             userRepo.saveAndFlush(user);
         }
-        return user;
+        return userFromDb;
     }
 
     @Override

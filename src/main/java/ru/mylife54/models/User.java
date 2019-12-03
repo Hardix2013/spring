@@ -38,8 +38,6 @@ public class User {
     private String profile;
     private Date birthday;
     private Date lastVisit;
-    @Transient
-    private MultipartFile imageProfile;
     private long balance;
     @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER, targetEntity = Role.class)
     private List<Role> roles;

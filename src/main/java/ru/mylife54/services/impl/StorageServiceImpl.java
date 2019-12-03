@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import ru.mylife54.exceptions.MediaTypeFormatExeption;
 import ru.mylife54.services.StorageService;
 import ru.mylife54.services.UserService;
 
@@ -41,7 +42,7 @@ public class StorageServiceImpl implements StorageService {
     @Override
     public boolean deleteFile(String filename) {
         if (filename != null) {
-            File file = new File(uploadPath+File.separator+filename);
+            File file = new File(uploadPath + File.separator + filename);
             file.delete();
             return true;
         } else {
@@ -50,7 +51,7 @@ public class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public List<String> uploadFiles(List<MediaType> mediatypes, MultipartFile... multipartFiles) throws IOException {
+    public List<String> uploadFiles(List<MediaType> mediatypes, MultipartFile... multipartFiles) throws IOException, MediaTypeFormatExeption {
         File dir = new File(uploadPath);
         List<String> files = new ArrayList<>();
         if (!dir.exists()) {
@@ -64,14 +65,16 @@ public class StorageServiceImpl implements StorageService {
                         .append(file.getOriginalFilename().hashCode()).toString();
                 fileInputStream = file.getInputStream();
                 for (MediaType mediaType : mediatypes) {
-                    if (mediatypes.toString().contains(tika.detect(fileInputStream))) {
+                    String inputMediatype = tika.detect(fileInputStream);
+                    if (mediatypes.toString().contains(inputMediatype)) {
                         file.transferTo(new File(getFileFullPath(filename)));
                         File uploadedFile = new File(getFileFullPath(filename));
                         if (uploadedFile.exists()) {
                             files.add(filename);
                         }
                     } else {
-                        System.out.println("Не соответствует mediatype");
+                        throw new MediaTypeFormatExeption("Не соответсвует mediatype файла: \n" +
+                                "Ожидалось: " + mediatypes.toString() + "\nПолучено: " + inputMediatype);
                     }
                 }
                 fileInputStream.close();

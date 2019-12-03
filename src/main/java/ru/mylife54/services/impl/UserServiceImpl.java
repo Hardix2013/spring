@@ -1,17 +1,21 @@
 package ru.mylife54.services.impl;
 
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import ru.mylife54.exceptions.MediaTypeFormatExeption;
+import ru.mylife54.exceptions.UserNotFoundException;
 import ru.mylife54.models.User;
 import ru.mylife54.repositories.UserRepo;
 import ru.mylife54.services.StorageService;
 import ru.mylife54.services.UserService;
 
+import java.beans.PropertyDescriptor;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.*;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -38,25 +42,32 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User addUser(User user) {
-        if(user.getImageProfile()!=null){
-            String fileName = null;
-            try {
-                fileName = storageService.uploadFiles(new ArrayList<>(Arrays.asList(
-                         MediaType.IMAGE_JPEG, MediaType.IMAGE_GIF, MediaType.IMAGE_PNG)),
-                         user.getImageProfile()).get(0);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            user.setProfile(fileName);
-        }
-        userRepo.saveAndFlush(user);
-        return userRepo.findUserByNickname(user.getNickname());
+    public User addUser(User user) throws UserNotFoundException {
+        return Optional.ofNullable(userRepo.saveAndFlush(user))
+                .orElseThrow(() -> new UserNotFoundException("Пользователь не сохранён"));
     }
 
     @Override
-    public User updateUser(User user) {
-        if (user != null && userRepo.findUserById(user.getId()) != null) {
+    public User updateUser(User user, MultipartFile profile) throws IOException, MediaTypeFormatExeption {
+        User userFromDb = userRepo.findUserById(user.getId());
+        if (user != null && userFromDb != null) {
+            if (profile != null) {
+                if (userFromDb.getProfile() != null) {
+                    storageService.deleteFile(userFromDb.getProfile());
+                }
+                String profileName = storageService.uploadFiles(new ArrayList<>(Arrays.asList(
+                        MediaType.IMAGE_JPEG,
+                        MediaType.IMAGE_GIF,
+                        MediaType.IMAGE_PNG)), profile).get(0);
+            }
+            Set<String> ignoredFields = new HashSet<>();
+            ignoredFields.add("id");
+            for (PropertyDescriptor pds : new BeanWrapperImpl().getPropertyDescriptors()) {
+                if (pds.getValue(pds.getName())==null){
+                    ignoredFields.add(pds.getName());
+                }
+            }
+            BeanUtils.copyProperties(user, userFromDb, ignoredFields.toArray(new String[ignoredFields.size()]));
             userRepo.saveAndFlush(user);
         }
         return user;
@@ -65,6 +76,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean removeUser(User user) {
         if (user != null && userRepo.findUserByNickname(user.getNickname()) != null) {
+            String profile = user.getProfile();
+            if (profile != null) {
+                storageService.deleteFile(profile);
+            }
             userRepo.delete(user);
             return true;
         } else {
@@ -74,12 +89,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean removeUser(long id) {
+        boolean result = false;
         User user = userRepo.findUserById(id);
         if (user != null) {
-            userRepo.delete(user);
-            return true;
-        } else {
-            return false;
+            result = removeUser(user);
         }
+        return result;
     }
 }
